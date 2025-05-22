@@ -32,4 +32,46 @@ class WeatherController extends Controller
             return response()->json(['error' => 'City not found or API error'], 404);
         }
     }
+
+    public function getForecast(Request $request)
+{
+    $city = $request->query('city', 'Nairobi');
+    $unit = $request->query('unit', 'metric');
+    $apikey = env('OPENWEATHER_API_KEY');
+
+    $url = "https://api.openweathermap.org/data/2.5/forecast?q={$city}&units={$unit}&appid={$apikey}";
+
+    $response = Http::get($url);
+
+    if ($response->successful()) {
+        $data = $response->json();
+
+        $forecast = [];
+
+        // Pick one forecast per day from the list (which has 3-hour interval data)
+        $usedDays = [];
+
+        foreach ($data['list'] as $entry) {
+            $date = substr($entry['dt_txt'], 0, 10); // format: YYYY-MM-DD
+
+            if (!in_array($date, $usedDays)) {
+                $forecast[] = [
+                    'date' => $date,
+                    'temp_min' => $entry['main']['temp_min'],
+                    'temp_max' => $entry['main']['temp_max'],
+                    'icon' => $entry['weather'][0]['icon'],
+                    'description' => $entry['weather'][0]['description'],
+                ];
+                $usedDays[] = $date;
+            }
+
+            if (count($forecast) >= 3) break;
+        }
+
+        return response()->json($forecast);
+    } else {
+        return response()->json(['error' => 'Unable to fetch forecast'], 500);
+    }
+}
+
 }
